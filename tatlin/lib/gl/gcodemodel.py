@@ -534,21 +534,32 @@ class GcodeModel(Model):
                     g = int(pixel_flat[1])
                     b = int(pixel_flat[2])
                 else:
+                    logging.info(f"Pick: pixel_flat too short: {len(pixel_flat)}")
                     return None
-            except (IndexError, TypeError, ValueError):
+            except (IndexError, TypeError, ValueError) as e:
+                logging.info(f"Pick: error reading pixel: {e}")
                 return None
+
+            logging.info(f"Pick: clicked at ({x}, {y}), pixel RGB=({r}, {g}, {b})")
 
             # Background is black (0, 0, 0), so skip it
             if r == 0 and g == 0 and b == 0:
+                logging.info("Pick: clicked on background (black pixel)")
                 return None
 
             # Decode color to movement index (1-based for non-black colors)
             movement_idx = (r << 16) | (g << 8) | b
             movement_idx -= 1  # Convert back to 0-based
 
+            logging.info(f"Pick: movement_idx={movement_idx}, total movements={len(self.movement_line_numbers)}")
+
             # Get the line number for this movement
             if 0 <= movement_idx < len(self.movement_line_numbers):
-                return self.movement_line_numbers[movement_idx]
+                line_no = self.movement_line_numbers[movement_idx]
+                logging.info(f"Pick: found line_no={line_no}")
+                return line_no
+            else:
+                logging.info(f"Pick: movement_idx {movement_idx} out of range")
 
         return None
 
