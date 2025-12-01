@@ -329,6 +329,9 @@ class Scene(BaseScene):
         # Perform picking
         line_no = self.model.pick_movement(x, y, size.width, size.height, self)
 
+        # Force redraw to clear picking artifacts
+        self.invalidate()
+
         # If a line was picked, notify the panel to select it
         if line_no is not None and self.gcode_panel is not None:
             self.gcode_panel.select_gcode_line(line_no)

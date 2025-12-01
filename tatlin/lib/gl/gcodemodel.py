@@ -484,8 +484,8 @@ class GcodeModel(Model):
         """
         from OpenGL.GL import glReadPixels, GL_RGB, GL_UNSIGNED_BYTE
 
-        # Save current clear color
-        glPushAttrib(GL_COLOR_BUFFER_BIT | GL_ENABLE_BIT)
+        # Save current OpenGL state
+        glPushAttrib(GL_COLOR_BUFFER_BIT | GL_ENABLE_BIT | GL_LIGHTING_BIT)
 
         # Disable lighting and blending for clean color picking
         glDisable(GL_LIGHTING)
@@ -497,35 +497,29 @@ class GcodeModel(Model):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         # Set up the same view as the normal rendering
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        scene.current_view.apply_projection(width, height)
-
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-        scene.current_view.apply_view()
+        scene.current_view.begin(width, height)
+        scene.current_view.display_transform()
 
         # Apply model transforms
+        glPushMatrix()
         offset_z = self.offset_z if not scene.mode_2d else 0
         glTranslate(self.offset_x, self.offset_y, offset_z)
 
         # Render each movement with a unique color
         self._render_for_picking()
 
+        # Pop model transform
+        glPopMatrix()
+
         # Read the pixel at the click position
         # Note: OpenGL y-coordinate is inverted
         gl_y = height - y
         pixel = glReadPixels(x, gl_y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE)
 
-        # Restore matrix state
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        glPopMatrix()
+        # Clean up view matrices
+        scene.current_view.end()
 
-        # Restore color and attributes
+        # Restore OpenGL state
         glPopAttrib()
 
         # Decode the color to get movement index
