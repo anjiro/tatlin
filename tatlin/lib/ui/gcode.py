@@ -29,6 +29,7 @@ class GcodePanel(Panel):
     def __init__(self, parent, scene: Scene, file_path=None):
         super(GcodePanel, self).__init__(parent, scene)
         self.file_path = file_path
+        self._last_selection = (-1, -1)  # Track last selection range
 
         # ----------------------------------------------------------------------
         # DIMENSIONS
@@ -131,6 +132,15 @@ class GcodePanel(Panel):
         self.check_3d.Bind(wx.EVT_CHECKBOX, self.on_set_mode)
         self.check_ortho.Bind(wx.EVT_CHECKBOX, self.on_set_ortho)
 
+        # Bind text selection events for highlighting in 3D view
+        self.text_gcode.Bind(wx.EVT_LEFT_UP, self.on_text_selection_changed)
+        self.text_gcode.Bind(wx.EVT_KEY_UP, self.on_text_selection_changed)
+
+        # Use a timer to poll for selection changes
+        self.selection_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_selection_timer, self.selection_timer)
+        self.selection_timer.Start(200)  # Check every 200ms
+
         self._handlers_connected = True
 
     def on_slider_moved(self, event):
@@ -161,6 +171,54 @@ class GcodePanel(Panel):
 
     def on_set_ortho(self, event):
         self.scene.mode_ortho = event.GetEventObject().GetValue()
+        self.scene.invalidate()
+
+    def on_text_selection_changed(self, event):
+        """Handle text selection change in the Gcode viewer."""
+        self._update_selection_highlight()
+        event.Skip()  # Allow event to propagate
+
+    def on_selection_timer(self, event):
+        """Periodically check if text selection has changed."""
+        self._update_selection_highlight()
+
+    def _update_selection_highlight(self):
+        """Update 3D view highlighting based on current text selection."""
+        # Get current selection range
+        start, end = self.text_gcode.GetSelection()
+
+        # Only update if selection has changed
+        if (start, end) == self._last_selection:
+            return
+
+        self._last_selection = (start, end)
+
+        # If no selection, clear highlights
+        if start == end:
+            self.scene.set_selected_gcode_lines([])
+            self.scene.invalidate()
+            return
+
+        # Convert character positions to line numbers
+        text = self.text_gcode.GetValue()
+        line_numbers = set()
+
+        # Find which lines are within the selection
+        current_pos = 0
+        for line_no, line in enumerate(text.split("\n"), start=1):
+            line_end = current_pos + len(line) + 1  # +1 for newline
+
+            # Check if this line overlaps with the selection
+            if current_pos < end and line_end > start:
+                line_numbers.add(line_no)
+
+            current_pos = line_end
+
+            if current_pos > end:
+                break
+
+        # Update the scene with selected lines
+        self.scene.set_selected_gcode_lines(line_numbers)
         self.scene.invalidate()
 
     def set_initial_values(self, layers_range_max, layers_value, width, height, depth):

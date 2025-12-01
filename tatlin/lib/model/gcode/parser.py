@@ -144,14 +144,15 @@ class Movement(object):
     FLAG_INCHES = 32
 
     # tell the python interpreter to only allocate memory for the following attributes
-    __slots__ = ["v", "delta_e", "feedrate", "flags"]
+    __slots__ = ["v", "delta_e", "feedrate", "flags", "line_no"]
 
-    def __init__(self, v, delta_e, feedrate, flags=0):
+    def __init__(self, v, delta_e, feedrate, flags=0, line_no=0):
         self.v = v
 
         self.delta_e = delta_e
         self.feedrate = feedrate
         self.flags = flags
+        self.line_no = line_no
 
     def angle(self, start, precision=0):
         x = self.v[0] - start[0]
@@ -239,7 +240,13 @@ class GcodeParser(object):
                         dst[2] * mm_in_inch,
                     )
 
-                move = Movement(array.array("f", dst), delta_e, args["F"], self.flags)
+                move = Movement(
+                    array.array("f", dst),
+                    delta_e,
+                    args["F"],
+                    self.flags,
+                    self.lexer.line_no,
+                )
                 movements.append(move)
 
             # if gcode contains a valid coordinate, update the previous point
