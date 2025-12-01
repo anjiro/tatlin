@@ -283,6 +283,16 @@ class Scene(BaseScene):
         """
         self.model.num_layers_to_draw = number
 
+    def set_selected_gcode_lines(self, line_numbers):
+        """
+        Set which Gcode lines are selected for highlighting in the 3D view.
+
+        Args:
+            line_numbers: Set or list of line numbers (1-indexed) to highlight
+        """
+        if hasattr(self.model, "set_selected_lines"):
+            self.model.set_selected_lines(line_numbers)
+
     def scale_model(self, factor):
         logging.info("--- scaling model by factor of:", factor)
         self.model.scale(factor)

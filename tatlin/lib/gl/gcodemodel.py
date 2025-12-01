@@ -78,6 +78,10 @@ class GcodeModel(Model):
         layer_markers_list = []
         self.layer_marker_stops = [0]
 
+        # Track line numbers for each movement (for highlighting selected lines)
+        self.movement_line_numbers = []  # List of line numbers, one per movement
+        self.selected_lines = set()  # Set of selected line numbers
+
         num_layers = len(model_data)
         callback_every = max(1, int(math.floor(num_layers / 100)))
 
@@ -103,6 +107,9 @@ class GcodeModel(Model):
                 arrow = vector.rotate(arrow, movement.angle(prev.v), 0.0, 0.0, 1.0)
                 arrow_list.extend(arrow)
                 arrow_endpoints.append(movement.v)  # Store the actual movement endpoint
+
+                # Track line number for this movement
+                self.movement_line_numbers.append(movement.line_no)
 
                 vertex_color = self.movement_color(movement)
                 # Each cylinder has cylinder_sides * 6 vertices (2 triangles per side, 3 vertices per triangle)
@@ -294,6 +301,10 @@ class GcodeModel(Model):
 
         self._display_movements(elevation, eye_height, mode_ortho, mode_2d)
 
+        # Display highlights for selected lines
+        if len(self.selected_lines) > 0:
+            self._display_selection_highlight(elevation, eye_height, mode_ortho, mode_2d)
+
         # Disable lighting for arrows and markers
         glDisable(GL_LIGHTING)
 
@@ -404,3 +415,58 @@ class GcodeModel(Model):
         glDrawArrays(GL_TRIANGLES, start, end - start)
 
         self.layer_marker_buffer.unbind()
+
+    def set_selected_lines(self, line_numbers):
+        """
+        Set which Gcode lines are currently selected for highlighting.
+
+        Args:
+            line_numbers: Set or list of line numbers (1-indexed)
+        """
+        self.selected_lines = set(line_numbers) if line_numbers else set()
+
+    def _display_selection_highlight(
+        self, elevation=0, eye_height=0, mode_ortho=False, mode_2d=False
+    ):
+        """
+        Render highlighted overlay for selected movements.
+        """
+        if not self.selected_lines:
+            return
+
+        # Find movements that correspond to selected lines
+        cylinder_sides = 8
+        vertices_per_movement = cylinder_sides * 6
+
+        # Use a brighter, semi-transparent overlay color
+        glColor4f(1.0, 1.0, 0.0, 0.5)  # Yellow highlight
+
+        # Enable blending for transparency
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Disable depth test to draw on top
+        glDisable(GL_DEPTH_TEST)
+
+        # Draw slightly larger to make highlight visible
+        glLineWidth(3.0)
+
+        self.vertex_buffer.bind()
+        glVertexPointer(3, GL_FLOAT, 0, None)
+
+        # Draw each selected movement
+        for movement_idx, line_no in enumerate(self.movement_line_numbers):
+            if line_no in self.selected_lines:
+                # Calculate vertex range for this movement
+                start_vertex = movement_idx * vertices_per_movement
+                count = vertices_per_movement
+
+                # Draw the movement geometry with highlight color
+                glDrawArrays(GL_TRIANGLES, start_vertex, count)
+
+        self.vertex_buffer.unbind()
+
+        # Restore OpenGL state
+        glEnable(GL_DEPTH_TEST)
+        glDisable(GL_BLEND)
+        glLineWidth(1.0)
