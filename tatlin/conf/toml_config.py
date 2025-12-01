@@ -7,8 +7,10 @@
 # (at your option) any later version.
 
 import tomllib
+import json
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+import logging
 
 
 class RenderConfig:
@@ -109,30 +111,94 @@ class RenderConfig:
         return default
 
 
+class MachineConfig:
+    """
+    Configuration for machine settings (platform offsets, etc.)
+    """
+
+    def __init__(self, config_dict: Optional[dict] = None):
+        if config_dict is None:
+            config_dict = {}
+
+        # Platform offsets (optional, for positioning models)
+        self.platform_offset_x = config_dict.get("platform_offset_x", 0.0)
+        self.platform_offset_y = config_dict.get("platform_offset_y", 0.0)
+        self.platform_offset_z = config_dict.get("platform_offset_z", 0.0)
+
+
+class UIConfig:
+    """
+    Configuration for UI settings (window size, mode, recent files).
+    These are runtime/session state saved to a JSON file.
+    """
+
+    def __init__(self, state_dict: Optional[dict] = None):
+        if state_dict is None:
+            state_dict = {}
+
+        # Window dimensions
+        self.window_w = state_dict.get("window_w", 640)
+        self.window_h = state_dict.get("window_h", 700)
+
+        # 2D mode preference
+        self.gcode_2d = state_dict.get("gcode_2d", False)
+
+        # Recent files list (list of tuples: (basename, filepath, filetype))
+        # Stored as list of dicts in JSON
+        recent = state_dict.get("recent_files", [])
+        self.recent_files = [(r.get("name", ""), r.get("path", ""), r.get("type"))
+                             for r in recent] if recent else []
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "window_w": self.window_w,
+            "window_h": self.window_h,
+            "gcode_2d": self.gcode_2d,
+            "recent_files": [
+                {"name": f[0], "path": f[1], "type": f[2]}
+                for f in self.recent_files
+            ]
+        }
+
+
 class TomlConfig:
     """
     Load and manage TOML configuration for Tatlin.
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None, state_path: Optional[str] = None):
         """
-        Load configuration from TOML file.
+        Load configuration from TOML file and state from JSON file.
 
         Args:
             config_path: Path to TOML config file. If None, searches default locations.
+            state_path: Path to JSON state file. If None, uses default location.
         """
         self.config_data = {}
         self.config_path = config_path
+        self.state_data = {}
+
+        # Determine state file path
+        if state_path is None:
+            state_path = os.path.expanduser(os.path.join("~", ".tatlin_state.json"))
+        self.state_path = state_path
 
         if config_path is None:
             # Search for config in default locations
             config_path = self._find_config()
+            self.config_path = config_path
 
         if config_path and os.path.exists(config_path):
             self._load_config(config_path)
 
-        # Initialize render configuration
+        # Load state from JSON
+        self._load_state()
+
+        # Initialize configuration objects
         self.render = RenderConfig(self.config_data.get("rendering"))
+        self.machine = MachineConfig(self.config_data.get("machine"))
+        self.ui = UIConfig(self.state_data)
 
     def _find_config(self) -> Optional[str]:
         """
@@ -159,8 +225,78 @@ class TomlConfig:
                 self.config_data = tomllib.load(f)
         except Exception as e:
             # If config fails to load, use defaults
-            print(f"Warning: Failed to load config from {path}: {e}")
+            logging.warning(f"Failed to load config from {path}: {e}")
             self.config_data = {}
+
+    def _load_state(self):
+        """Load UI state from JSON file."""
+        if os.path.exists(self.state_path):
+            try:
+                with open(self.state_path, "r") as f:
+                    self.state_data = json.load(f)
+            except Exception as e:
+                logging.warning(f"Failed to load state from {self.state_path}: {e}")
+                self.state_data = {}
+        else:
+            self.state_data = {}
+
+    def _save_state(self):
+        """Save UI state to JSON file."""
+        try:
+            with open(self.state_path, "w") as f:
+                json.dump(self.ui.to_dict(), f, indent=2)
+        except Exception as e:
+            logging.warning(f"Failed to save state to {self.state_path}: {e}")
+
+    # Compatibility methods for old Config API
+    def read(self, key: str, conv=None):
+        """
+        Read a configuration value with backward compatibility.
+        Supports old INI-style keys like 'machine.platform_w', 'ui.window_w', etc.
+        """
+        # Map old INI keys to new structure
+        if key == "machine.platform_w":
+            return self.render.platform_width
+        elif key == "machine.platform_d":
+            return self.render.platform_depth
+        elif key == "machine.platform_offset_x":
+            return self.machine.platform_offset_x
+        elif key == "machine.platform_offset_y":
+            return self.machine.platform_offset_y
+        elif key == "machine.platform_offset_z":
+            return self.machine.platform_offset_z
+        elif key == "ui.window_w":
+            return self.ui.window_w
+        elif key == "ui.window_h":
+            return self.ui.window_h
+        elif key == "ui.gcode_2d":
+            return self.ui.gcode_2d
+        elif key == "ui.recent_files":
+            # Return None to match old behavior (recent files handled separately)
+            return None
+        else:
+            logging.warning(f"Unknown config key: {key}")
+            return None
+
+    def write(self, key: str, val):
+        """
+        Write a configuration value with backward compatibility.
+        """
+        if key == "ui.window_w":
+            self.ui.window_w = int(val)
+        elif key == "ui.window_h":
+            self.ui.window_h = int(val)
+        elif key == "ui.gcode_2d":
+            self.ui.gcode_2d = bool(int(val)) if isinstance(val, (int, str)) else bool(val)
+        elif key == "ui.recent_files":
+            # Recent files handled by update_recent_files method
+            pass
+        else:
+            logging.warning(f"Cannot write to config key: {key}")
+
+    def commit(self):
+        """Save state to JSON file."""
+        self._save_state()
 
 
 # Global config instance - will be initialized by the application

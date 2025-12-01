@@ -53,10 +53,9 @@ from tatlin.lib.ui.dialogs import (
     OpenErrorAlert,
 )
 
-from tatlin.lib.util import format_status, get_recent_files, resolve_path
+from tatlin.lib.util import format_status, resolve_path
 from tatlin.lib.constants import RECENT_FILE_LIMIT, TATLIN_LICENSE, TATLIN_VERSION
-from tatlin.conf.config import Config
-from tatlin.conf import get_config
+from tatlin.conf import TomlConfig, get_config, set_config
 
 
 class App(BaseApp):
@@ -74,7 +73,8 @@ class App(BaseApp):
 
         self.init_config()
 
-        self.recent_files = get_recent_files(self.config)
+        # Recent files are now stored directly in config.ui.recent_files
+        self.recent_files = self.config.ui.recent_files[:RECENT_FILE_LIMIT]
         self.window.update_recent_files_menu(self.recent_files)
 
         window_w = self.config.read("ui.window_w", int)
@@ -83,8 +83,11 @@ class App(BaseApp):
         self.init_scene()
 
     def init_config(self):
-        fname = os.path.expanduser(os.path.join("~", ".tatlin"))
-        self.config = Config(fname)
+        # Initialize TOML config (searches for config.toml in standard locations)
+        # State is stored in ~/.tatlin_state.json
+        self.config = TomlConfig()
+        # Set as global config
+        set_config(self.config)
 
     def init_scene(self):
         self.panel: Any = None
@@ -157,25 +160,22 @@ class App(BaseApp):
         changes if the scene has been modified.
         """
         try:
-            self.config.write(
-                "ui.recent_files",
-                os.path.pathsep.join(
-                    [
-                        f[1] + str(OpenDialog.ftypes.index(f[2]))
-                        for f in self.recent_files
-                    ]
-                ),
-            )
+            # Update recent files in config
+            self.config.ui.recent_files = self.recent_files[:RECENT_FILE_LIMIT]
+
+            # Update window size
             w, h = self.window.get_size()
             self.config.write("ui.window_w", w)
             self.config.write("ui.window_h", h)
+
+            # Update 2D mode preference
             if self.scene:
                 self.config.write("ui.gcode_2d", int(self.scene.mode_2d))
+
+            # Save state to JSON
             self.config.commit()
-        except IOError:
-            logging.warning(
-                "Could not write settings to config file %s" % self.config.fname
-            )
+        except Exception as e:
+            logging.warning(f"Could not write settings to state file: {e}")
 
         if self.save_changes_dialog():
             self.window.quit()
@@ -234,21 +234,8 @@ class App(BaseApp):
             )
 
             # platform needs to be added last to be translucent
-            # Check TOML config first, then fall back to INI config
-            toml_config = get_config()
-
-            # Check if platform dimensions are explicitly set in TOML config
-            # by looking at the raw config data
-            if (toml_config.config_data.get("rendering", {}).get("platform", {}).get("width") is not None and
-                toml_config.config_data.get("rendering", {}).get("platform", {}).get("depth") is not None):
-                # Use TOML config values
-                platform_w = toml_config.render.platform_width
-                platform_d = toml_config.render.platform_depth
-            else:
-                # Fall back to INI config
-                platform_w = self.config.read("machine.platform_w", float)
-                platform_d = self.config.read("machine.platform_d", float)
-
+            platform_w = self.config.read("machine.platform_w", float)
+            platform_d = self.config.read("machine.platform_d", float)
             platform = Platform(platform_w, platform_d)
             self.scene.add_supporting_actor(platform)
 

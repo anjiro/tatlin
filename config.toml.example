@@ -4,10 +4,23 @@
 #   - ~/.tatlin.toml
 #   - ~/.config/tatlin/config.toml
 #   - tatlin.toml (in the current directory)
+#   - config.toml (in the current directory)
 #
 # All values shown here are the defaults. You can omit any setting
 # to use the default value.
+#
+# Note: Runtime state (window size, recent files, 2D mode preference)
+# is automatically saved to ~/.tatlin_state.json
 
+# Machine settings
+[machine]
+# Platform offsets (optional, for positioning models on the build plate)
+# These are typically left at 0.0
+platform_offset_x = 0.0
+platform_offset_y = 0.0
+platform_offset_z = 0.0
+
+# Rendering settings
 [rendering]
 
 # Background color for the 3D rendering view (RGBA, values 0.0-1.0)

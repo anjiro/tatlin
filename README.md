@@ -50,20 +50,11 @@ Mouse navigation
 
 ## Configuration
 
-Tatlin supports two types of configuration files:
+Tatlin uses a TOML configuration file for user settings and a JSON file for application state.
 
-### Machine Configuration (INI format)
+### Configuration File (TOML format)
 
-Build platform size and other machine settings can be customized by creating a
-configuration file called `.tatlin` in your user's home directory:
-
-    [machine]
-    platform_w = 300
-    platform_d = 300
-
-### Rendering Configuration (TOML format)
-
-Visual rendering settings (colors, fonts, sizes) can be customized using a TOML
+User settings (colors, fonts, platform size, etc.) can be customized using a TOML
 configuration file. Tatlin will look for configuration in these locations (in order):
 
 - `~/.tatlin.toml`
@@ -75,17 +66,22 @@ An example configuration file with all available options is provided in
 `config.toml.example`. Copy this file to one of the locations above and customize
 as needed. All settings are optional - any omitted setting will use the default value.
 
-Available rendering settings include:
+Available configuration settings include:
 
-- Gcode line colors (for different movement types)
-- Selection highlight colors
-- Cylinder thickness for Gcode rendering
-- Font family and size for the Gcode text viewer
-- Platform (build plate) dimensions, grid size and colors
-- Background color
+- **Machine settings**: Platform offsets for model positioning
+- **Rendering settings**:
+  - Gcode line colors (for different movement types)
+  - Selection highlight colors
+  - Cylinder thickness and geometry detail
+  - Font family and size for the Gcode text viewer
+  - Platform (build plate) dimensions, grid size and colors
+  - Background color
 
-**Note:** Platform dimensions can be set in either the TOML config or the INI config.
-If set in both, the TOML config takes precedence.
+### Application State (JSON format)
+
+Runtime state (window size, recent files, 2D mode preference) is automatically
+saved to `~/.tatlin_state.json` when you quit the application. You don't need
+to manually edit this file.
 
 ## Feedback and Issues
 
