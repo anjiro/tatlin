@@ -438,18 +438,17 @@ class GcodeModel(Model):
         cylinder_sides = 8
         vertices_per_movement = cylinder_sides * 6
 
-        # Use a brighter, semi-transparent overlay color
-        glColor4f(1.0, 1.0, 0.0, 0.5)  # Yellow highlight
+        # Use a brighter, more opaque yellow highlight
+        glColor4f(1.0, 1.0, 0.0, 0.8)  # Brighter yellow with more opacity
 
-        # Enable blending for transparency
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Keep depth test enabled but use polygon offset to draw slightly in front
+        glEnable(GL_POLYGON_OFFSET_FILL)
+        glPolygonOffset(-1.0, -1.0)  # Negative values push towards camera
 
-        # Disable depth test to draw on top
-        glDisable(GL_DEPTH_TEST)
-
-        # Draw slightly larger to make highlight visible
-        glLineWidth(3.0)
+        # Disable lighting for flat highlight color
+        lighting_was_enabled = glIsEnabled(GL_LIGHTING)
+        if lighting_was_enabled:
+            glDisable(GL_LIGHTING)
 
         self.vertex_buffer.bind()
         glVertexPointer(3, GL_FLOAT, 0, None)
@@ -467,6 +466,6 @@ class GcodeModel(Model):
         self.vertex_buffer.unbind()
 
         # Restore OpenGL state
-        glEnable(GL_DEPTH_TEST)
-        glDisable(GL_BLEND)
-        glLineWidth(1.0)
+        glDisable(GL_POLYGON_OFFSET_FILL)
+        if lighting_was_enabled:
+            glEnable(GL_LIGHTING)

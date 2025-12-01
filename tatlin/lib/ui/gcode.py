@@ -195,7 +195,7 @@ class GcodePanel(Panel):
 
         # If no selection, clear highlights
         if start == end:
-            self.scene.set_selected_gcode_lines([])
+            self.scene.set_selected_gcode_lines(set())  # Explicitly pass empty set
             self.scene.invalidate()
             return
 
