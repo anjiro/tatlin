@@ -522,6 +522,9 @@ class GcodeModel(Model):
         # Restore OpenGL state
         glPopAttrib()
 
+        # Debug: log raw pixel data
+        logging.info(f"Pick: raw pixel type={type(pixel)}, shape={getattr(pixel, 'shape', 'no shape')}, data={pixel}")
+
         # Decode the color to get movement index
         if pixel is not None:
             # Handle different pixel data formats from glReadPixels
@@ -529,13 +532,24 @@ class GcodeModel(Model):
             try:
                 # Convert to flat list - handles various numpy/array formats
                 pixel_flat = numpy.array(pixel).flatten()
+                logging.info(f"Pick: pixel_flat length={len(pixel_flat)}, values={pixel_flat}")
+
                 if len(pixel_flat) >= 3:
                     r = int(pixel_flat[0])
                     g = int(pixel_flat[1])
                     b = int(pixel_flat[2])
                 else:
-                    logging.info(f"Pick: pixel_flat too short: {len(pixel_flat)}")
-                    return None
+                    logging.info(f"Pick: pixel_flat too short: {len(pixel_flat)}, trying direct access")
+                    # Maybe the data is packed as a single integer? Try to extract it
+                    if len(pixel_flat) == 1:
+                        val = int(pixel_flat[0])
+                        # Try to decode as packed RGB
+                        r = (val >> 16) & 0xFF
+                        g = (val >> 8) & 0xFF
+                        b = val & 0xFF
+                        logging.info(f"Pick: decoded packed value {val} to RGB=({r}, {g}, {b})")
+                    else:
+                        return None
             except (IndexError, TypeError, ValueError) as e:
                 logging.info(f"Pick: error reading pixel: {e}")
                 return None
