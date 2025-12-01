@@ -318,16 +318,34 @@ class Scene(BaseScene):
         Handle mouse click for selecting Gcode line.
 
         Args:
-            x, y: Mouse coordinates
+            x, y: Mouse coordinates (in logical pixels)
         """
         if not hasattr(self.model, "pick_movement"):
             return
 
-        # Get window size for coordinate conversion
+        # Get window size in logical pixels
         size = self.GetClientSize()
 
-        # Perform picking
-        line_no = self.model.pick_movement(x, y, size.width, size.height, self)
+        # Get content scale factor for Retina/HiDPI displays
+        # On Retina displays, the framebuffer is 2x the logical size
+        try:
+            scale_factor = self.GetContentScaleFactor()
+        except AttributeError:
+            # Fallback: check OpenGL viewport size vs window size
+            from OpenGL.GL import glGetIntegerv, GL_VIEWPORT
+            viewport = glGetIntegerv(GL_VIEWPORT)
+            scale_factor = viewport[2] / size.width if size.width > 0 else 1.0
+
+        # Scale coordinates to physical pixels
+        physical_x = int(x * scale_factor)
+        physical_y = int(y * scale_factor)
+        physical_width = int(size.width * scale_factor)
+        physical_height = int(size.height * scale_factor)
+
+        # Perform picking with physical pixel coordinates
+        line_no = self.model.pick_movement(
+            physical_x, physical_y, physical_width, physical_height, self
+        )
 
         # Force redraw to clear picking artifacts
         self.invalidate()
