@@ -523,10 +523,20 @@ class GcodeModel(Model):
         glPopAttrib()
 
         # Decode the color to get movement index
-        if pixel:
-            r = pixel[0][0][0]
-            g = pixel[0][0][1]
-            b = pixel[0][0][2]
+        if pixel is not None:
+            # Handle different pixel data formats from glReadPixels
+            # Flatten to a simple list to handle platform differences
+            try:
+                # Convert to flat list - handles various numpy/array formats
+                pixel_flat = numpy.array(pixel).flatten()
+                if len(pixel_flat) >= 3:
+                    r = int(pixel_flat[0])
+                    g = int(pixel_flat[1])
+                    b = int(pixel_flat[2])
+                else:
+                    return None
+            except (IndexError, TypeError, ValueError):
+                return None
 
             # Background is black (0, 0, 0), so skip it
             if r == 0 and g == 0 and b == 0:
