@@ -26,8 +26,9 @@ from .view import ViewButtons
 
 
 class GcodePanel(Panel):
-    def __init__(self, parent, scene: Scene):
+    def __init__(self, parent, scene: Scene, file_path=None):
         super(GcodePanel, self).__init__(parent, scene)
+        self.file_path = file_path
 
         # ----------------------------------------------------------------------
         # DIMENSIONS
@@ -81,9 +82,42 @@ class GcodePanel(Panel):
 
         sizer_display.Add(box_display, 0, wx.EXPAND | wx.ALL, border=5)
 
+        # ----------------------------------------------------------------------
+        # GCODE TEXT VIEW
+        # ----------------------------------------------------------------------
+
+        static_box_gcode = wx.StaticBox(self, label="Gcode")
+        sizer_gcode = wx.StaticBoxSizer(static_box_gcode, wx.VERTICAL)
+
+        # Create text control for Gcode display
+        # TE_MULTILINE: multiline text control
+        # TE_READONLY: read-only (selectable but not editable)
+        # TE_RICH2: enables text styling for syntax highlighting
+        # TE_DONTWRAP: don't wrap long lines
+        self.text_gcode = wx.TextCtrl(
+            self,
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2 | wx.TE_DONTWRAP,
+        )
+
+        # Set fixed-width (monospace) font
+        font = wx.Font(
+            9,
+            wx.FONTFAMILY_TELETYPE,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL,
+        )
+        self.text_gcode.SetFont(font)
+
+        # Load and display Gcode file content
+        if self.file_path:
+            self._load_gcode_text()
+
+        sizer_gcode.Add(self.text_gcode, 1, wx.EXPAND | wx.ALL, border=5)
+
         box = wx.BoxSizer(wx.VERTICAL)
         box.Add(sizer_dimensions, 0, wx.EXPAND | wx.TOP | wx.RIGHT | wx.LEFT, border=5)
         box.Add(sizer_display, 0, wx.EXPAND | wx.TOP | wx.RIGHT | wx.LEFT, border=5)
+        box.Add(sizer_gcode, 1, wx.EXPAND | wx.ALL, border=5)  # proportion=1 to take remaining space
 
         self.SetSizer(box)
 
@@ -146,3 +180,118 @@ class GcodePanel(Panel):
 
     def set_3d_view(self, value):
         self.check_3d.SetValue(value)
+
+    def _load_gcode_text(self):
+        """Load Gcode file content and apply syntax highlighting."""
+        if not self.file_path:
+            return
+
+        try:
+            with open(self.file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+
+            # Set the text content
+            self.text_gcode.SetValue(content)
+
+            # Apply syntax highlighting
+            self._apply_syntax_highlighting(content)
+
+        except Exception as e:
+            self.text_gcode.SetValue(f"Error loading file: {e}")
+
+    def _apply_syntax_highlighting(self, content):
+        """Apply syntax highlighting to Gcode text."""
+        lines = content.split("\n")
+        pos = 0
+
+        # Define colors for syntax highlighting
+        comment_color = wx.Colour(100, 100, 100)  # Gray for comments
+        gcode_color = wx.Colour(0, 0, 200)  # Blue for G-codes
+        mcode_color = wx.Colour(200, 0, 200)  # Magenta for M-codes
+        param_color = wx.Colour(0, 128, 0)  # Green for parameters
+
+        # Freeze the control to prevent flickering during updates
+        self.text_gcode.Freeze()
+
+        for line in lines:
+            line_start = pos
+            stripped = line.strip()
+
+            # Find comment position
+            comment_pos = line.find(";")
+            if comment_pos == -1:
+                comment_pos = len(line)
+
+            # Process non-comment part
+            if comment_pos > 0:
+                non_comment = line[:comment_pos]
+                i = 0
+                while i < len(non_comment):
+                    # Skip whitespace
+                    if non_comment[i].isspace():
+                        i += 1
+                        continue
+
+                    # Check for G-code
+                    if non_comment[i].upper() == "G" and i + 1 < len(non_comment):
+                        # Find end of G-code number
+                        j = i + 1
+                        while j < len(non_comment) and (
+                            non_comment[j].isdigit() or non_comment[j] == "."
+                        ):
+                            j += 1
+                        self.text_gcode.SetStyle(
+                            line_start + i, line_start + j, wx.TextAttr(gcode_color)
+                        )
+                        i = j
+                        continue
+
+                    # Check for M-code
+                    if non_comment[i].upper() == "M" and i + 1 < len(non_comment):
+                        # Find end of M-code number
+                        j = i + 1
+                        while j < len(non_comment) and non_comment[j].isdigit():
+                            j += 1
+                        self.text_gcode.SetStyle(
+                            line_start + i, line_start + j, wx.TextAttr(mcode_color)
+                        )
+                        i = j
+                        continue
+
+                    # Check for parameters (X, Y, Z, E, F, etc.)
+                    if (
+                        non_comment[i].upper()
+                        in "XYZEFIJPQRS"
+                        and i + 1 < len(non_comment)
+                    ):
+                        # Find end of parameter value
+                        j = i + 1
+                        while j < len(non_comment) and (
+                            non_comment[j].isdigit()
+                            or non_comment[j] in ".-+"
+                        ):
+                            j += 1
+                        self.text_gcode.SetStyle(
+                            line_start + i, line_start + j, wx.TextAttr(param_color)
+                        )
+                        i = j
+                        continue
+
+                    i += 1
+
+            # Highlight comment
+            if comment_pos < len(line):
+                self.text_gcode.SetStyle(
+                    line_start + comment_pos,
+                    line_start + len(line),
+                    wx.TextAttr(comment_color),
+                )
+
+            # Move to next line (including newline character)
+            pos += len(line) + 1
+
+        # Thaw the control to redraw
+        self.text_gcode.Thaw()
+
+        # Scroll to top
+        self.text_gcode.SetInsertionPoint(0)
