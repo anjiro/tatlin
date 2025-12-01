@@ -116,9 +116,13 @@ class MainWindow(wx.Frame):
             for child in self.splitter.GetChildren():
                 child.Destroy()
 
+        # Reparent scene and panel to have splitter as parent
+        scene.Reparent(self.splitter)
+        panel.Reparent(self.splitter)
+
         # Add scene (left) and panel (right) to splitter
         self.splitter.SplitVertically(scene, panel)
-        # Set initial sash position (80% for scene, 20% for panel)
+        # Set initial sash position (75% for scene, 25% for panel)
         width = self.GetSize().GetWidth()
         self.splitter.SetSashPosition(int(width * 0.75))
 
