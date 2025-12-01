@@ -239,7 +239,13 @@ class App(BaseApp):
             self.scene.add_supporting_actor(platform)
 
             # update panel to reflect new model properties
-            self.panel = Panel(self.window, self.scene)
+            # Pass file path to panel for Gcode text display (GcodePanel supports it)
+            try:
+                self.panel = Panel(self.window, self.scene, file_path=fpath)
+            except TypeError:
+                # Panel doesn't accept file_path parameter (e.g., StlPanel)
+                self.panel = Panel(self.window, self.scene)
+
             self.panel.set_initial_values(
                 getattr(model, "max_layers", 0),
                 getattr(model, "max_layers", 0),

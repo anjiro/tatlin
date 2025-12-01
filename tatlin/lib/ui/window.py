@@ -59,7 +59,8 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_MENU, app.on_quit, item_quit)
         self.Bind(wx.EVT_MENU, app.on_about, item_about)
 
-        self.box_scene = wx.BoxSizer(wx.HORIZONTAL)
+        # Create splitter window for resizable sidebar (will be created when file is loaded)
+        self.splitter = None
 
         self.panel_startup = StartupPanel(self)
         self.panel_startup.btn_open.Bind(wx.EVT_BUTTON, app.on_file_open)
@@ -102,12 +103,29 @@ class MainWindow(wx.Frame):
         # remove startup panel if present
         if self._filename is None:
             self.panel_startup.Destroy()
-            self.box_main.Add(self.box_scene, 1, wx.EXPAND)
-        # remove previous scene and panel, if any, destroying the widgets
-        self.box_scene.Clear(True)
-        self.box_scene.Add(scene, 1, wx.EXPAND)
-        self.box_scene.Add(panel, 0, wx.EXPAND)
-        self.box_scene.ShowItems(True)
+            # Create splitter window on first file load
+            self.splitter = wx.SplitterWindow(self, style=wx.SP_3D | wx.SP_LIVE_UPDATE)
+            self.splitter.SetMinimumPaneSize(200)  # Minimum width for both panes
+            self.box_main.Add(self.splitter, 1, wx.EXPAND)
+        # remove previous scene and panel if any
+        elif self.splitter:
+            # Unsplit before destroying old widgets
+            if self.splitter.IsSplit():
+                self.splitter.Unsplit()
+            # Destroy old windows
+            for child in self.splitter.GetChildren():
+                child.Destroy()
+
+        # Reparent scene and panel to have splitter as parent
+        scene.Reparent(self.splitter)
+        panel.Reparent(self.splitter)
+
+        # Add scene (left) and panel (right) to splitter
+        self.splitter.SplitVertically(scene, panel)
+        # Set initial sash position (75% for scene, 25% for panel)
+        width = self.GetSize().GetWidth()
+        self.splitter.SetSashPosition(int(width * 0.75))
+
         self.Layout()  # without this call, wxPython does not draw the new widgets until window resize
 
     def menu_enable_file_items(self, enable=True):
