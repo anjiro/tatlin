@@ -69,15 +69,21 @@ class GcodeModel(Model):
         t_start = time.time()
 
         vertex_list = []
+        normal_list = []
         color_list = []
         self.layer_stops = [0]
         self.layer_heights = []
         arrow_list = []
+        arrow_endpoints = []  # Track movement endpoints for arrow positioning
         layer_markers_list = []
         self.layer_marker_stops = [0]
 
         num_layers = len(model_data)
         callback_every = max(1, int(math.floor(num_layers / 100)))
+
+        # cylinder parameters
+        cylinder_sides = 8
+        cylinder_radius = 0.1  # thin cylinder radius in mm
 
         # the first movement designates the starting point
         start = prev = model_data[0][0]
@@ -85,14 +91,24 @@ class GcodeModel(Model):
         for layer_idx, layer in enumerate(model_data):
             first = layer[0]
             for movement in layer:
-                vertex_list.append(prev.v)
-                vertex_list.append(movement.v)
+                # Generate cylinder geometry for this movement segment
+                vertices, normals = self._generate_cylinder(
+                    prev.v, movement.v, cylinder_radius, cylinder_sides
+                )
+                vertex_list.extend(vertices)
+                normal_list.extend(normals)
+
                 arrow = self.arrow
                 # position the arrow with respect to movement
                 arrow = vector.rotate(arrow, movement.angle(prev.v), 0.0, 0.0, 1.0)
                 arrow_list.extend(arrow)
+                arrow_endpoints.append(movement.v)  # Store the actual movement endpoint
+
                 vertex_color = self.movement_color(movement)
-                color_list.append(vertex_color)
+                # Each cylinder has cylinder_sides * 6 vertices (2 triangles per side, 3 vertices per triangle)
+                num_cylinder_vertices = cylinder_sides * 6
+                for _ in range(num_cylinder_vertices):
+                    color_list.append(vertex_color)
                 prev = movement
 
             self.layer_stops.append(len(vertex_list))
@@ -116,19 +132,17 @@ class GcodeModel(Model):
                 callback(layer_idx + 1, num_layers)
 
         self.vertices = numpy.array(vertex_list, "f")
+        self.normals = numpy.array(normal_list, "f")
         self.colors = numpy.array(color_list, "f")
         self.arrows = numpy.array(arrow_list, "f")
         self.layer_markers = numpy.array(layer_markers_list, "f")
 
+        # Position arrows at movement endpoints
         # by translating the arrow vertices outside of the loop, we achieve a
-        # significant performance gain thanks to numpy. it would be really nice
-        # if we could rotate in a similar fashion...
-        self.arrows = self.arrows + self.vertices[1::2].repeat(3, 0)
-
-        # for every pair of vertices of the model, there are 3 vertices for the arrow
-        assert len(self.arrows) == (
-            (len(self.vertices) // 2) * 3
-        ), "The 2:3 ratio of model vertices to arrow vertices does not hold."
+        # significant performance gain thanks to numpy
+        if len(arrow_endpoints) > 0:
+            arrow_endpoints_array = numpy.array(arrow_endpoints, "f")
+            self.arrows = self.arrows + arrow_endpoints_array.repeat(3, 0)
 
         self.max_layers = len(self.layer_stops) - 1
         self.num_layers_to_draw = self.max_layers
@@ -140,6 +154,71 @@ class GcodeModel(Model):
 
         logging.info("Initialized Gcode model in %.2f seconds" % (t_end - t_start))
         logging.info("Vertex count: %d" % self.vertex_count)
+
+    def _generate_cylinder(self, start, end, radius, sides):
+        """
+        Generate vertices and normals for a cylinder between two points.
+        Returns (vertices, normals) as lists suitable for GL_TRIANGLES.
+        """
+        start = numpy.array(start, dtype=float)
+        end = numpy.array(end, dtype=float)
+
+        # Calculate direction vector
+        direction = end - start
+        length = numpy.linalg.norm(direction)
+
+        if length < 1e-6:
+            # Degenerate case: zero-length segment, return empty lists
+            return [], []
+
+        direction = direction / length
+
+        # Find perpendicular vectors using cross product
+        # Choose a vector that's not parallel to direction
+        if abs(direction[0]) < 0.9:
+            arbitrary = numpy.array([1.0, 0.0, 0.0])
+        else:
+            arbitrary = numpy.array([0.0, 1.0, 0.0])
+
+        perp1 = numpy.cross(direction, arbitrary)
+        perp1 = perp1 / numpy.linalg.norm(perp1)
+        perp2 = numpy.cross(direction, perp1)
+        perp2 = perp2 / numpy.linalg.norm(perp2)
+
+        # Generate vertices around the circles
+        vertices = []
+        normals = []
+
+        for i in range(sides):
+            angle1 = 2.0 * math.pi * i / sides
+            angle2 = 2.0 * math.pi * ((i + 1) % sides) / sides
+
+            # Calculate normals (pointing outward from cylinder axis)
+            normal1 = math.cos(angle1) * perp1 + math.sin(angle1) * perp2
+            normal2 = math.cos(angle2) * perp1 + math.sin(angle2) * perp2
+
+            # Calculate vertices on start circle
+            offset1_start = radius * normal1
+            offset2_start = radius * normal2
+            v1_start = start + offset1_start
+            v2_start = start + offset2_start
+
+            # Calculate vertices on end circle
+            offset1_end = radius * normal1
+            offset2_end = radius * normal2
+            v1_end = end + offset1_end
+            v2_end = end + offset2_end
+
+            # Create two triangles for this side of the cylinder
+            # Triangle 1: v1_start, v2_start, v1_end
+            vertices.extend([v1_start, v2_start, v1_end])
+            normals.extend([normal1, normal2, normal1])
+
+            # Triangle 2: v2_start, v2_end, v1_end
+            vertices.extend([v2_start, v2_end, v1_end])
+            normals.extend([normal2, normal2, normal1])
+
+        return vertices, normals
 
     def movement_color(self, move):
         """
@@ -171,15 +250,22 @@ class GcodeModel(Model):
 
     def init(self):
         self.vertex_buffer = VBO(self.vertices, "GL_STATIC_DRAW")
-        self.vertex_color_buffer = VBO(
-            self.colors.repeat(2, 0), "GL_STATIC_DRAW"
-        )  # each pair of vertices shares the color
+        self.normal_buffer = VBO(self.normals, "GL_STATIC_DRAW")
+        self.vertex_color_buffer = VBO(self.colors, "GL_STATIC_DRAW")
 
         if self.arrows_enabled:
             self.arrow_buffer = VBO(self.arrows, "GL_STATIC_DRAW")
-            self.arrow_color_buffer = VBO(
-                self.colors.repeat(3, 0), "GL_STATIC_DRAW"
-            )  # each triplet of vertices shares the color
+            # For arrows, we need to calculate how many movements we have
+            # Each movement has cylinder_sides * 6 vertices
+            cylinder_sides = 8
+            vertices_per_movement = cylinder_sides * 6
+            num_movements = len(self.vertices) // vertices_per_movement
+            # Create color buffer for arrows (3 vertices per arrow, one color per movement)
+            arrow_colors = []
+            for i in range(num_movements):
+                color = self.colors[i * vertices_per_movement]
+                arrow_colors.extend([color] * 3)
+            self.arrow_color_buffer = VBO(numpy.array(arrow_colors, "f"), "GL_STATIC_DRAW")
 
         self.layer_marker_buffer = VBO(self.layer_markers, "GL_STATIC_DRAW")
 
@@ -192,9 +278,24 @@ class GcodeModel(Model):
         glTranslate(self.offset_x, self.offset_y, offset_z)
 
         glEnableClientState(GL_VERTEX_ARRAY)
+        glEnableClientState(GL_NORMAL_ARRAY)
         glEnableClientState(GL_COLOR_ARRAY)
 
+        # Enable lighting for 3D cylinders
+        glEnable(GL_LIGHTING)
+        glEnable(GL_LIGHT0)
+        glEnable(GL_COLOR_MATERIAL)
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+
+        # Set up a simple light
+        glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
+        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
+
         self._display_movements(elevation, eye_height, mode_ortho, mode_2d)
+
+        # Disable lighting for arrows and markers
+        glDisable(GL_LIGHTING)
 
         if self.arrows_enabled:
             self._display_arrows()
@@ -204,6 +305,7 @@ class GcodeModel(Model):
         if self.arrows_enabled:
             self._display_layer_markers()
 
+        glDisableClientState(GL_NORMAL_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
         glPopMatrix()
 
@@ -213,6 +315,9 @@ class GcodeModel(Model):
         self.vertex_buffer.bind()
         glVertexPointer(3, GL_FLOAT, 0, None)
 
+        self.normal_buffer.bind()
+        glNormalPointer(GL_FLOAT, 0, None)
+
         self.vertex_color_buffer.bind()
         glColorPointer(4, GL_FLOAT, 0, None)
 
@@ -220,14 +325,14 @@ class GcodeModel(Model):
             glScale(1.0, 1.0, 0.0)  # discard z coordinates
             start = self.layer_stops[self.num_layers_to_draw - 1]
             end = self.layer_stops[self.num_layers_to_draw]
-            glDrawArrays(GL_LINES, start, end - start)
+            glDrawArrays(GL_TRIANGLES, start, end - start)
 
         elif mode_ortho:
             if elevation >= 0:
                 # draw layers in normal order, bottom to top
                 start = 0
                 end = self.layer_stops[self.num_layers_to_draw]
-                glDrawArrays(GL_LINES, start, end - start)
+                glDrawArrays(GL_TRIANGLES, start, end - start)
 
             else:
                 # draw layers in reverse order, top to bottom
@@ -235,7 +340,7 @@ class GcodeModel(Model):
                 while stop_idx >= 0:
                     start = self.layer_stops[stop_idx]
                     end = self.layer_stops[stop_idx + 1]
-                    glDrawArrays(GL_LINES, start, end - start)
+                    glDrawArrays(GL_TRIANGLES, start, end - start)
                     stop_idx -= 1
 
         else:  # 3d projection mode
@@ -250,7 +355,7 @@ class GcodeModel(Model):
                 )
                 start = 0
                 end = self.layer_stops[normal_layers_to_draw]
-                glDrawArrays(GL_LINES, start, end - start)
+                glDrawArrays(GL_TRIANGLES, start, end - start)
 
             if reverse_threshold_layer + 1 < self.num_layers_to_draw:
                 # draw layers from the threshold in reverse order, top to bottom
@@ -258,10 +363,11 @@ class GcodeModel(Model):
                 while stop_idx > reverse_threshold_layer:
                     start = self.layer_stops[stop_idx]
                     end = self.layer_stops[stop_idx + 1]
-                    glDrawArrays(GL_LINES, start, end - start)
+                    glDrawArrays(GL_TRIANGLES, start, end - start)
                     stop_idx -= 1
 
         self.vertex_buffer.unbind()
+        self.normal_buffer.unbind()
         self.vertex_color_buffer.unbind()
 
     def _layer_up_to_height(self, height):
