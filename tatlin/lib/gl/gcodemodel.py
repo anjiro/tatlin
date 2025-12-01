@@ -523,32 +523,30 @@ class GcodeModel(Model):
         glPopAttrib()
 
         # Debug: log raw pixel data
-        logging.info(f"Pick: raw pixel type={type(pixel)}, shape={getattr(pixel, 'shape', 'no shape')}, data={pixel}")
+        logging.info(f"Pick: raw pixel type={type(pixel)}, data={pixel}")
 
         # Decode the color to get movement index
         if pixel is not None:
             # Handle different pixel data formats from glReadPixels
-            # Flatten to a simple list to handle platform differences
             try:
-                # Convert to flat list - handles various numpy/array formats
-                pixel_flat = numpy.array(pixel).flatten()
-                logging.info(f"Pick: pixel_flat length={len(pixel_flat)}, values={pixel_flat}")
-
-                if len(pixel_flat) >= 3:
-                    r = int(pixel_flat[0])
-                    g = int(pixel_flat[1])
-                    b = int(pixel_flat[2])
-                else:
-                    logging.info(f"Pick: pixel_flat too short: {len(pixel_flat)}, trying direct access")
-                    # Maybe the data is packed as a single integer? Try to extract it
-                    if len(pixel_flat) == 1:
-                        val = int(pixel_flat[0])
-                        # Try to decode as packed RGB
-                        r = (val >> 16) & 0xFF
-                        g = (val >> 8) & 0xFF
-                        b = val & 0xFF
-                        logging.info(f"Pick: decoded packed value {val} to RGB=({r}, {g}, {b})")
+                # On macOS, glReadPixels returns a bytes object
+                if isinstance(pixel, bytes):
+                    if len(pixel) >= 3:
+                        r = pixel[0]
+                        g = pixel[1]
+                        b = pixel[2]
                     else:
+                        logging.info(f"Pick: bytes too short: {len(pixel)}")
+                        return None
+                # On other platforms, it may return a numpy array
+                else:
+                    pixel_flat = numpy.array(pixel).flatten()
+                    if len(pixel_flat) >= 3:
+                        r = int(pixel_flat[0])
+                        g = int(pixel_flat[1])
+                        b = int(pixel_flat[2])
+                    else:
+                        logging.info(f"Pick: array too short: {len(pixel_flat)}")
                         return None
             except (IndexError, TypeError, ValueError) as e:
                 logging.info(f"Pick: error reading pixel: {e}")
