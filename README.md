@@ -48,13 +48,41 @@ Mouse navigation
 - Middle mouse button to offset the platform
 - Right mouse button to pan
 
-Build platform size can be customed by creating a configuration file called
-`.tatlin` in your user's home directory and specifying the width and depth of
-the platform in millimeters:
+## Configuration
+
+Tatlin supports two types of configuration files:
+
+### Machine Configuration (INI format)
+
+Build platform size and other machine settings can be customized by creating a
+configuration file called `.tatlin` in your user's home directory:
 
     [machine]
     platform_w = 300
     platform_d = 300
+
+### Rendering Configuration (TOML format)
+
+Visual rendering settings (colors, fonts, sizes) can be customized using a TOML
+configuration file. Tatlin will look for configuration in these locations (in order):
+
+- `~/.tatlin.toml`
+- `~/.config/tatlin/config.toml`
+- `tatlin.toml` (in the current directory)
+- `config.toml` (in the current directory)
+
+An example configuration file with all available options is provided in
+`config.toml.example`. Copy this file to one of the locations above and customize
+as needed. All settings are optional - any omitted setting will use the default value.
+
+Available rendering settings include:
+
+- Gcode line colors (for different movement types)
+- Selection highlight colors
+- Cylinder thickness for Gcode rendering
+- Font family and size for the Gcode text viewer
+- Platform grid size and colors
+- Background color
 
 ## Feedback and Issues
 

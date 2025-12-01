@@ -1,0 +1,76 @@
+# Tatlin Configuration File
+# This is an example configuration file showing all available options.
+# Copy this file to one of the following locations to use it:
+#   - ~/.tatlin.toml
+#   - ~/.config/tatlin/config.toml
+#   - tatlin.toml (in the current directory)
+#
+# All values shown here are the defaults. You can omit any setting
+# to use the default value.
+
+[rendering]
+
+# Background color for the 3D rendering view (RGBA, values 0.0-1.0)
+background_color = [0.0, 0.0, 0.0, 0.0]  # Black
+
+# Gcode line colors (RGBA, values 0.0-1.0)
+[rendering.gcode_colors]
+# Default movement color (travel moves, non-extruding)
+movement_default = [0.6, 0.6, 0.6, 0.6]  # Gray
+
+# Outer perimeter color (extruding outer perimeter)
+outer_perimeter = [0.0, 0.875, 0.875, 0.6]  # Cyan
+
+# Inner perimeter color (extruding inner perimeter)
+perimeter = [0.0, 1.0, 0.0, 0.6]  # Green
+
+# Loop/infill color (extruding loops)
+loop = [1.0, 0.875, 0.0, 0.6]  # Yellow
+
+# General extrusion color (extruding, no specific type)
+extruder_on = [1.0, 0.0, 0.0, 0.6]  # Red
+
+# Selection highlight settings
+[rendering.selection]
+# Color for selected Gcode lines (RGBA, values 0.0-1.0)
+color = [1.0, 1.0, 0.0, 0.8]  # Bright yellow
+
+# Alternatively, you can use an alpha multiplier instead of replacing the color
+# If set, this will multiply the original line's alpha by this value
+# Uncomment to use (comment out or remove 'color' setting above):
+# alpha_multiplier = 1.5
+
+# Cylinder rendering parameters
+# Radius of the cylinders that represent Gcode lines (in mm)
+cylinder_radius = 0.1
+
+# Number of sides for the cylinder geometry (higher = smoother but slower)
+cylinder_sides = 8
+
+# Font settings for the Gcode text viewer
+[rendering.font]
+# Font size in points
+size = 9
+
+# Font family: "monospace", "sans-serif", "serif", or "default"
+family = "monospace"
+
+# Platform (build plate) grid settings
+[rendering.platform]
+# Major grid line spacing (in mm)
+grid_size = 10
+
+# Grid line colors (RGBA, values 0.0-1.0)
+# Default colors are a greenish tint
+[rendering.platform.colors]
+# Minor grid lines (every 1mm)
+minor = [0.686, 0.875, 0.373, 0.1]
+
+# Intermediate grid lines (every 5mm)
+intermediate = [0.686, 0.875, 0.373, 0.2]
+
+# Major grid lines (every 10mm by default)
+major = [0.686, 0.875, 0.373, 0.33]
+
+# Platform fill color
+fill = [0.686, 0.875, 0.373, 0.05]

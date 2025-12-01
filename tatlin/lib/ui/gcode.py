@@ -21,6 +21,7 @@ import wx
 from tatlin.lib.gl.scene import Scene
 from tatlin.lib.ui.panel import Panel
 from tatlin.lib.util import format_float
+from tatlin.conf import get_config
 
 from .view import ViewButtons
 
@@ -100,10 +101,25 @@ class GcodePanel(Panel):
             style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2 | wx.TE_DONTWRAP,
         )
 
-        # Set fixed-width (monospace) font
+        # Set fixed-width (monospace) font from configuration
+        config = get_config()
+        font_size = config.render.font_size
+
+        # Map font family names to wx constants
+        font_family_map = {
+            "monospace": wx.FONTFAMILY_TELETYPE,
+            "teletype": wx.FONTFAMILY_TELETYPE,
+            "sans-serif": wx.FONTFAMILY_SWISS,
+            "serif": wx.FONTFAMILY_ROMAN,
+            "default": wx.FONTFAMILY_DEFAULT,
+        }
+        font_family = font_family_map.get(
+            config.render.font_family.lower(), wx.FONTFAMILY_TELETYPE
+        )
+
         font = wx.Font(
-            9,
-            wx.FONTFAMILY_TELETYPE,
+            font_size,
+            font_family,
             wx.FONTSTYLE_NORMAL,
             wx.FONTWEIGHT_NORMAL,
         )

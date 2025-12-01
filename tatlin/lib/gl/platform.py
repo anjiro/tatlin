@@ -19,6 +19,7 @@ from OpenGL.GL import *  # type:ignore
 from OpenGL.GLE import *  # type:ignore
 
 from .util import compile_display_list
+from tatlin.conf import get_config
 
 
 class Platform(object):
@@ -26,16 +27,17 @@ class Platform(object):
     Platform on which models are placed.
     """
 
-    graduations_major = 10
-
     def __init__(self, width, depth):
         self.width = width
         self.depth = depth
 
-        self.color_grads_minor = (0xAF / 255, 0xDF / 255, 0x5F / 255, 0.1)
-        self.color_grads_interm = (0xAF / 255, 0xDF / 255, 0x5F / 255, 0.2)
-        self.color_grads_major = (0xAF / 255, 0xDF / 255, 0x5F / 255, 0.33)
-        self.color_fill = (0xAF / 255, 0xDF / 255, 0x5F / 255, 0.05)
+        # Load colors from configuration
+        config = get_config()
+        self.graduations_major = config.render.platform_grid_size
+        self.color_grads_minor = config.render.platform_color_minor
+        self.color_grads_interm = config.render.platform_color_intermediate
+        self.color_grads_major = config.render.platform_color_major
+        self.color_fill = config.render.platform_color_fill
 
         self.initialized = False
 

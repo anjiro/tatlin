@@ -29,6 +29,7 @@ from .model import Model
 
 from tatlin.lib import vector
 from tatlin.lib.model.gcode.parser import Movement
+from tatlin.conf import get_config
 
 
 class GcodeModel(Model):
@@ -85,9 +86,13 @@ class GcodeModel(Model):
         num_layers = len(model_data)
         callback_every = max(1, int(math.floor(num_layers / 100)))
 
-        # cylinder parameters
-        cylinder_sides = 8
-        cylinder_radius = 0.1  # thin cylinder radius in mm
+        # cylinder parameters from configuration
+        config = get_config()
+        cylinder_sides = config.render.cylinder_sides
+        cylinder_radius = config.render.cylinder_radius
+
+        # Store cylinder_sides for use in other methods
+        self.cylinder_sides = cylinder_sides
 
         # the first movement designates the starting point
         start = prev = model_data[0][0]
@@ -231,8 +236,10 @@ class GcodeModel(Model):
         """
         Return the color to use for particular type of movement.
         """
-        # default movement color is gray
-        color = (0.6, 0.6, 0.6, 0.6)
+        config = get_config()
+
+        # default movement color from config
+        color = config.render.color_movement_default
 
         extruder_on = move.flags & Movement.FLAG_EXTRUDER_ON or move.delta_e > 0
         outer_perimeter = (
@@ -241,13 +248,13 @@ class GcodeModel(Model):
         )
 
         if extruder_on and outer_perimeter:
-            color = (0.0, 0.875, 0.875, 0.6)  # cyan
+            color = config.render.color_outer_perimeter
         elif extruder_on and move.flags & Movement.FLAG_PERIMETER:
-            color = (0.0, 1.0, 0.0, 0.6)  # green
+            color = config.render.color_perimeter
         elif extruder_on and move.flags & Movement.FLAG_LOOP:
-            color = (1.0, 0.875, 0.0, 0.6)  # yellow
+            color = config.render.color_loop
         elif extruder_on:
-            color = (1.0, 0.0, 0.0, 0.6)  # red
+            color = config.render.color_extruder_on
 
         return color
 
@@ -264,8 +271,7 @@ class GcodeModel(Model):
             self.arrow_buffer = VBO(self.arrows, "GL_STATIC_DRAW")
             # For arrows, we need to calculate how many movements we have
             # Each movement has cylinder_sides * 6 vertices
-            cylinder_sides = 8
-            vertices_per_movement = cylinder_sides * 6
+            vertices_per_movement = self.cylinder_sides * 6
             num_movements = len(self.vertices) // vertices_per_movement
             # Create color buffer for arrows (3 vertices per arrow, one color per movement)
             arrow_colors = []
@@ -434,12 +440,14 @@ class GcodeModel(Model):
         if not self.selected_lines:
             return
 
-        # Find movements that correspond to selected lines
-        cylinder_sides = 8
-        vertices_per_movement = cylinder_sides * 6
+        config = get_config()
 
-        # Use a brighter, more opaque yellow highlight
-        glColor4f(1.0, 1.0, 0.0, 0.8)  # Brighter yellow with more opacity
+        # Find movements that correspond to selected lines
+        vertices_per_movement = self.cylinder_sides * 6
+
+        # Use selection color from config
+        sel_color = config.render.selection_color
+        glColor4f(sel_color[0], sel_color[1], sel_color[2], sel_color[3])
 
         # Keep depth test enabled but use polygon offset to draw slightly in front
         glEnable(GL_POLYGON_OFFSET_FILL)
@@ -565,8 +573,7 @@ class GcodeModel(Model):
         Render movements with unique colors for picking.
         Each movement gets a unique RGB color based on its index.
         """
-        cylinder_sides = 8
-        vertices_per_movement = cylinder_sides * 6
+        vertices_per_movement = self.cylinder_sides * 6
 
         glEnableClientState(GL_VERTEX_ARRAY)
         self.vertex_buffer.bind()

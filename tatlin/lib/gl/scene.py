@@ -25,6 +25,7 @@ from OpenGL.GLU import *  # type:ignore
 from OpenGL.GLUT import *  # type:ignore
 
 from tatlin.lib.ui.basescene import BaseScene
+from tatlin.conf import get_config
 
 from .model import Model
 from .views import View2D, View3D
@@ -73,7 +74,10 @@ class Scene(BaseScene):
     # ------------------------------------------------------------------------
 
     def init(self):
-        glClearColor(0.0, 0.0, 0.0, 0.0)  # set clear color to black
+        # Set background color from configuration
+        config = get_config()
+        bg_color = config.render.background_color
+        glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3])
         glClearDepth(1.0)  # set depth value to 1
         glDepthFunc(GL_LEQUAL)
 
