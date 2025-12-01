@@ -320,31 +320,21 @@ class Scene(BaseScene):
         Args:
             x, y: Mouse coordinates
         """
-        logging.info(f"Click: _handle_click called at ({x}, {y})")
-
         if not hasattr(self.model, "pick_movement"):
-            logging.info("Click: model has no pick_movement method")
             return
 
         # Get window size for coordinate conversion
         size = self.GetClientSize()
-        logging.info(f"Click: window size = {size.width}x{size.height}")
 
         # Perform picking
         line_no = self.model.pick_movement(x, y, size.width, size.height, self)
-        logging.info(f"Click: pick_movement returned line_no={line_no}")
 
         # Force redraw to clear picking artifacts
         self.invalidate()
 
         # If a line was picked, notify the panel to select it
         if line_no is not None and self.gcode_panel is not None:
-            logging.info(f"Click: calling select_gcode_line({line_no})")
             self.gcode_panel.select_gcode_line(line_no)
-        elif line_no is None:
-            logging.info("Click: line_no is None, not selecting")
-        elif self.gcode_panel is None:
-            logging.info("Click: gcode_panel is None")
 
     def scale_model(self, factor):
         logging.info("--- scaling model by factor of:", factor)

@@ -522,9 +522,6 @@ class GcodeModel(Model):
         # Restore OpenGL state
         glPopAttrib()
 
-        # Debug: log raw pixel data
-        logging.info(f"Pick: raw pixel type={type(pixel)}, data={pixel}")
-
         # Decode the color to get movement index
         if pixel is not None:
             # Handle different pixel data formats from glReadPixels
@@ -536,7 +533,6 @@ class GcodeModel(Model):
                         g = pixel[1]
                         b = pixel[2]
                     else:
-                        logging.info(f"Pick: bytes too short: {len(pixel)}")
                         return None
                 # On other platforms, it may return a numpy array
                 else:
@@ -546,32 +542,21 @@ class GcodeModel(Model):
                         g = int(pixel_flat[1])
                         b = int(pixel_flat[2])
                     else:
-                        logging.info(f"Pick: array too short: {len(pixel_flat)}")
                         return None
-            except (IndexError, TypeError, ValueError) as e:
-                logging.info(f"Pick: error reading pixel: {e}")
+            except (IndexError, TypeError, ValueError):
                 return None
-
-            logging.info(f"Pick: clicked at ({x}, {y}), pixel RGB=({r}, {g}, {b})")
 
             # Background is black (0, 0, 0), so skip it
             if r == 0 and g == 0 and b == 0:
-                logging.info("Pick: clicked on background (black pixel)")
                 return None
 
             # Decode color to movement index (1-based for non-black colors)
             movement_idx = (r << 16) | (g << 8) | b
             movement_idx -= 1  # Convert back to 0-based
 
-            logging.info(f"Pick: movement_idx={movement_idx}, total movements={len(self.movement_line_numbers)}")
-
             # Get the line number for this movement
             if 0 <= movement_idx < len(self.movement_line_numbers):
-                line_no = self.movement_line_numbers[movement_idx]
-                logging.info(f"Pick: found line_no={line_no}")
-                return line_no
-            else:
-                logging.info(f"Pick: movement_idx {movement_idx} out of range")
+                return self.movement_line_numbers[movement_idx]
 
         return None
 
