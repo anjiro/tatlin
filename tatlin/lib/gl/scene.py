@@ -50,6 +50,9 @@ class Scene(BaseScene):
         self.actors = []
         self.cursor_x = 0
         self.cursor_y = 0
+        self.mouse_down_x = 0
+        self.mouse_down_y = 0
+        self.gcode_panel = None  # Reference to panel for text selection
 
         self.view_ortho = View2D()
         self.view_perspective = View3D()
@@ -195,6 +198,14 @@ class Scene(BaseScene):
     def button_press(self, x, y):
         self.cursor_x = x
         self.cursor_y = y
+        self.mouse_down_x = x
+        self.mouse_down_y = y
+
+    def button_release(self, x, y):
+        # Check if this is a click (not a drag)
+        drag_distance = ((x - self.mouse_down_x) ** 2 + (y - self.mouse_down_y) ** 2) ** 0.5
+        if drag_distance < 5:  # Less than 5 pixels = click
+            self._handle_click(x, y)
 
     def button_motion(self, x, y, left, middle, right):
         delta_x = x - self.cursor_x
@@ -292,6 +303,35 @@ class Scene(BaseScene):
         """
         if hasattr(self.model, "set_selected_lines"):
             self.model.set_selected_lines(line_numbers)
+
+    def set_gcode_panel(self, panel):
+        """
+        Set reference to the Gcode panel for bidirectional selection.
+
+        Args:
+            panel: GcodePanel instance
+        """
+        self.gcode_panel = panel
+
+    def _handle_click(self, x, y):
+        """
+        Handle mouse click for selecting Gcode line.
+
+        Args:
+            x, y: Mouse coordinates
+        """
+        if not hasattr(self.model, "pick_movement"):
+            return
+
+        # Get window size for coordinate conversion
+        size = self.GetClientSize()
+
+        # Perform picking
+        line_no = self.model.pick_movement(x, y, size.width, size.height, self)
+
+        # If a line was picked, notify the panel to select it
+        if line_no is not None and self.gcode_panel is not None:
+            self.gcode_panel.select_gcode_line(line_no)
 
     def scale_model(self, factor):
         logging.info("--- scaling model by factor of:", factor)

@@ -258,6 +258,10 @@ class App(BaseApp):
             if hasattr(self.panel, "set_3d_view"):
                 self.panel.set_3d_view(not self.scene.mode_2d)  # type:ignore
 
+            # Connect scene to panel for bidirectional selection (Gcode only)
+            if hasattr(self.panel, "select_gcode_line"):
+                self.scene.set_gcode_panel(self.panel)
+
             # always start with the same view on the scene
             self.scene.reset_view(True)
 

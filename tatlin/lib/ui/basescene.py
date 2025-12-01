@@ -35,6 +35,7 @@ class BaseScene(glcanvas.GLCanvas):
         self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_mouse_down)
+        self.Bind(wx.EVT_LEFT_UP, self._on_mouse_up)
         self.Bind(wx.EVT_MOTION, self._on_mouse_motion)
 
         # make it unnecessary for the scene to be in focus to respond to the
@@ -51,6 +52,7 @@ class BaseScene(glcanvas.GLCanvas):
             "display",
             "reshape",
             "button_press",
+            "button_release",
             "button_motion",
             "wheel_scroll",
         ]
@@ -116,6 +118,10 @@ class BaseScene(glcanvas.GLCanvas):
         self.SetFocus()
         x, y = event.GetPosition()
         self.button_press(x, y)
+
+    def _on_mouse_up(self, event):
+        x, y = event.GetPosition()
+        self.button_release(x, y)
 
     def _on_mouse_motion(self, event):
         x, y = event.GetPosition()

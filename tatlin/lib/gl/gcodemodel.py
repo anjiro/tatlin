@@ -469,3 +469,111 @@ class GcodeModel(Model):
         glDisable(GL_POLYGON_OFFSET_FILL)
         if lighting_was_enabled:
             glEnable(GL_LIGHTING)
+
+    def pick_movement(self, x, y, width, height, scene):
+        """
+        Perform color picking to determine which movement was clicked.
+
+        Args:
+            x, y: Mouse coordinates
+            width, height: Window dimensions
+            scene: Scene object for rendering context
+
+        Returns:
+            Line number of clicked movement, or None if no movement was clicked
+        """
+        from OpenGL.GL import glReadPixels, GL_RGB, GL_UNSIGNED_BYTE
+
+        # Save current clear color
+        glPushAttrib(GL_COLOR_BUFFER_BIT | GL_ENABLE_BIT)
+
+        # Disable lighting and blending for clean color picking
+        glDisable(GL_LIGHTING)
+        glDisable(GL_BLEND)
+        glDisable(GL_DITHER)
+
+        # Clear the buffer
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Set up the same view as the normal rendering
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        scene.current_view.apply_projection(width, height)
+
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        scene.current_view.apply_view()
+
+        # Apply model transforms
+        offset_z = self.offset_z if not scene.mode_2d else 0
+        glTranslate(self.offset_x, self.offset_y, offset_z)
+
+        # Render each movement with a unique color
+        self._render_for_picking()
+
+        # Read the pixel at the click position
+        # Note: OpenGL y-coordinate is inverted
+        gl_y = height - y
+        pixel = glReadPixels(x, gl_y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE)
+
+        # Restore matrix state
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        glPopMatrix()
+
+        # Restore color and attributes
+        glPopAttrib()
+
+        # Decode the color to get movement index
+        if pixel:
+            r = pixel[0][0][0]
+            g = pixel[0][0][1]
+            b = pixel[0][0][2]
+
+            # Background is black (0, 0, 0), so skip it
+            if r == 0 and g == 0 and b == 0:
+                return None
+
+            # Decode color to movement index (1-based for non-black colors)
+            movement_idx = (r << 16) | (g << 8) | b
+            movement_idx -= 1  # Convert back to 0-based
+
+            # Get the line number for this movement
+            if 0 <= movement_idx < len(self.movement_line_numbers):
+                return self.movement_line_numbers[movement_idx]
+
+        return None
+
+    def _render_for_picking(self):
+        """
+        Render movements with unique colors for picking.
+        Each movement gets a unique RGB color based on its index.
+        """
+        cylinder_sides = 8
+        vertices_per_movement = cylinder_sides * 6
+
+        glEnableClientState(GL_VERTEX_ARRAY)
+        self.vertex_buffer.bind()
+        glVertexPointer(3, GL_FLOAT, 0, None)
+
+        # Draw each movement with a unique color
+        for movement_idx in range(len(self.movement_line_numbers)):
+            # Encode movement index as RGB color (1-based to avoid black)
+            color_id = movement_idx + 1
+            r = ((color_id >> 16) & 0xFF) / 255.0
+            g = ((color_id >> 8) & 0xFF) / 255.0
+            b = (color_id & 0xFF) / 255.0
+
+            glColor3f(r, g, b)
+
+            # Draw this movement
+            start_vertex = movement_idx * vertices_per_movement
+            count = vertices_per_movement
+            glDrawArrays(GL_TRIANGLES, start_vertex, count)
+
+        self.vertex_buffer.unbind()
+        glDisableClientState(GL_VERTEX_ARRAY)

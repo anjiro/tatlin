@@ -239,6 +239,35 @@ class GcodePanel(Panel):
     def set_3d_view(self, value):
         self.check_3d.SetValue(value)
 
+    def select_gcode_line(self, line_no):
+        """
+        Select a specific line in the Gcode text viewer.
+
+        Args:
+            line_no: Line number to select (1-indexed)
+        """
+        if not self.file_path:
+            return
+
+        # Get the text content
+        text = self.text_gcode.GetValue()
+        lines = text.split("\n")
+
+        # Validate line number
+        if line_no < 1 or line_no > len(lines):
+            return
+
+        # Calculate character position for the line
+        char_pos = sum(len(line) + 1 for line in lines[:line_no - 1])  # +1 for newline
+        line_length = len(lines[line_no - 1])
+
+        # Select the line
+        self.text_gcode.SetSelection(char_pos, char_pos + line_length)
+
+        # Scroll to make the line visible
+        # Calculate approximate line position for scrolling
+        self.text_gcode.ShowPosition(char_pos)
+
     def _load_gcode_text(self):
         """Load Gcode file content and apply syntax highlighting."""
         if not self.file_path:
