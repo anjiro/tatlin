@@ -55,8 +55,15 @@ size = 9
 # Font family: "monospace", "sans-serif", "serif", or "default"
 family = "monospace"
 
-# Platform (build plate) grid settings
+# Platform (build plate) settings
 [rendering.platform]
+# Build plate dimensions (in mm)
+# Default is MakerBot Thing-O-Matic size
+# Note: If you have these set in ~/.tatlin (INI format), those will be used
+# unless you explicitly set width and depth here in the TOML config
+width = 120
+depth = 100
+
 # Major grid line spacing (in mm)
 grid_size = 10
 

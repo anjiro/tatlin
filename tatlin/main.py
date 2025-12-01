@@ -56,6 +56,7 @@ from tatlin.lib.ui.dialogs import (
 from tatlin.lib.util import format_status, get_recent_files, resolve_path
 from tatlin.lib.constants import RECENT_FILE_LIMIT, TATLIN_LICENSE, TATLIN_VERSION
 from tatlin.conf.config import Config
+from tatlin.conf import get_config
 
 
 class App(BaseApp):
@@ -233,8 +234,21 @@ class App(BaseApp):
             )
 
             # platform needs to be added last to be translucent
-            platform_w = self.config.read("machine.platform_w", float)
-            platform_d = self.config.read("machine.platform_d", float)
+            # Check TOML config first, then fall back to INI config
+            toml_config = get_config()
+
+            # Check if platform dimensions are explicitly set in TOML config
+            # by looking at the raw config data
+            if (toml_config.config_data.get("rendering", {}).get("platform", {}).get("width") is not None and
+                toml_config.config_data.get("rendering", {}).get("platform", {}).get("depth") is not None):
+                # Use TOML config values
+                platform_w = toml_config.render.platform_width
+                platform_d = toml_config.render.platform_depth
+            else:
+                # Fall back to INI config
+                platform_w = self.config.read("machine.platform_w", float)
+                platform_d = self.config.read("machine.platform_d", float)
+
             platform = Platform(platform_w, platform_d)
             self.scene.add_supporting_actor(platform)
 

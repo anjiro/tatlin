@@ -62,6 +62,8 @@ class RenderConfig:
 
         # Platform/grid settings
         platform = config_dict.get("platform", {})
+        self.platform_width = platform.get("width", 120)  # Default: MakerBot Thing-O-Matic size
+        self.platform_depth = platform.get("depth", 100)
         self.platform_grid_size = platform.get("grid_size", 10)
 
         grid_colors = platform.get("colors", {})

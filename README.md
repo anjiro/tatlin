@@ -81,8 +81,11 @@ Available rendering settings include:
 - Selection highlight colors
 - Cylinder thickness for Gcode rendering
 - Font family and size for the Gcode text viewer
-- Platform grid size and colors
+- Platform (build plate) dimensions, grid size and colors
 - Background color
+
+**Note:** Platform dimensions can be set in either the TOML config or the INI config.
+If set in both, the TOML config takes precedence.
 
 ## Feedback and Issues
 
