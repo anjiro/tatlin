@@ -179,9 +179,19 @@ class TomlConfig:
         self.config_path = config_path
         self.state_data = {}
 
-        # Determine state file path
+        # Determine state file path using XDG Base Directory Specification
         if state_path is None:
-            state_path = os.path.expanduser(os.path.join("~", ".tatlin_state.json"))
+            # Use XDG_STATE_HOME if set, otherwise default to ~/.local/state
+            xdg_state_home = os.environ.get("XDG_STATE_HOME")
+            if xdg_state_home:
+                state_dir = os.path.join(xdg_state_home, "tatlin")
+            else:
+                state_dir = os.path.expanduser(os.path.join("~", ".local", "state", "tatlin"))
+
+            # Create directory if it doesn't exist
+            os.makedirs(state_dir, exist_ok=True)
+
+            state_path = os.path.join(state_dir, "state.json")
         self.state_path = state_path
 
         if config_path is None:

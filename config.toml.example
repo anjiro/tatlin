@@ -10,7 +10,8 @@
 # to use the default value.
 #
 # Note: Runtime state (window size, recent files, 2D mode preference)
-# is automatically saved to ~/.tatlin_state.json
+# is automatically saved to $XDG_STATE_HOME/tatlin/state.json
+# (or ~/.local/state/tatlin/state.json if XDG_STATE_HOME is not set)
 
 # Machine settings
 [machine]

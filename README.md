@@ -80,7 +80,8 @@ Available configuration settings include:
 ### Application State (JSON format)
 
 Runtime state (window size, recent files, 2D mode preference) is automatically
-saved to `~/.tatlin_state.json` when you quit the application. You don't need
+saved to `$XDG_STATE_HOME/tatlin/state.json` (or `~/.local/state/tatlin/state.json`
+if `XDG_STATE_HOME` is not set) when you quit the application. You don't need
 to manually edit this file.
 
 ## Feedback and Issues
